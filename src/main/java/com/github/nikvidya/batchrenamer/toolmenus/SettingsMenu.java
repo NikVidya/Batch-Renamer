@@ -1,10 +1,7 @@
 package com.github.nikvidya.batchrenamer.toolmenus;
 
 import com.github.nikvidya.batchrenamer.utils.PriorityStage;
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.scene.Scene;
-import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.control.Button;

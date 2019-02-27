@@ -2,7 +2,10 @@ package com.github.nikvidya.batchrenamer.main;
 
 import com.github.nikvidya.batchrenamer.toolmenus.SettingsMenu;
 import com.github.nikvidya.batchrenamer.utils.Constants;
+
 import javafx.application.Application;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -15,21 +18,25 @@ import javafx.stage.Stage;
 import java.io.File;
 import java.util.Iterator;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
- * Entry point for the program
+ * Entry point for the program, acts as controller for the program
  * TODO: Make user-defined variables
- * TODO: Offload main functions to other classes according to MVC
- * TODO: Add feedback and preview panels so user knows how the renaming scheme will look
+ * TODO: Add feedback and preview panels so user knows how the renaming scheme will look (View)
  * TODO: Add undo button to reverse the rename
  * TODO: Add tooltips (instead of long bracketed notes in the labels)
  */
 public class Main extends Application {
+    private Model model;
+
     // layout and interfaces
     private BorderPane layout;
     private VBox controlPane;
+    private VBox filePreviewPane;
+    private HBox filePreviewListPane;
     private SettingsMenu settingsMenu;
+    private ListView<File> fileListView;
+    private ListView<String> previewListView;
 
     // top menu bar
     private MenuBar menuBar;
@@ -41,14 +48,12 @@ public class Main extends Application {
     private Button fileChooseButton;
     private Label filePathLabel;
     private FileChooser fileChooser;
-    private List<File> fileList;
 
     // main controls
     private TextField mainTextField;
     private TextField extensionTextField;
     private Button renameButton;
 
-    String filePath;
 
     public static void main(String[] args) {
         launch(args);
@@ -58,8 +63,8 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Batch Renamer");
 
-        // Settings menu popup
-        settingsMenu = new SettingsMenu();
+        model = new Model();
+
 
         // Top menu items
         // File Menu
@@ -68,6 +73,9 @@ public class Main extends Application {
         settingsMenuItem.setOnAction(e -> settingsMenu.show());
         exitMenuItem = new MenuItem("Exit");
         exitMenuItem.setOnAction(e -> primaryStage.close());
+
+        // Settings menu
+        settingsMenu = new SettingsMenu();
 
         // Assemble File Menu
         fileMenu.getItems().add(settingsMenuItem);
@@ -78,20 +86,51 @@ public class Main extends Application {
         menuBar = new MenuBar();
         menuBar.getMenus().add(fileMenu);
 
+        // File rename previews
+        fileListView = new ListView<>();
+        fileListView.setMaxWidth(150);
+        fileListView.setCellFactory(lv -> new ListCell<File>() {
+            @Override
+            public void updateItem(File item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setText(null);
+                } else {
+                    setText(item.getName());
+                }
+            }
+        });
+        previewListView = new ListView<>();
+        previewListView.setMaxWidth(150);
+        previewListView.setCellFactory(lv -> new ListCell<String>() {
+            @Override
+            public void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setText(null);
+                } else {
+                    setText(item);
+                }
+            }
+        });
+
         // Controls
         fileChooseButton = new Button("Select Files");
         filePathLabel = new Label("");
         fileChooser = new FileChooser();
         fileChooser.setTitle("Select files to batch rename");
         fileChooseButton.setOnAction(e -> {
-            fileList = fileChooser.showOpenMultipleDialog(primaryStage);
-            if (fileList != null) {
-                filePath = fileList.get(0).getAbsolutePath().substring(0, fileList.get(0).getAbsolutePath().lastIndexOf(File.separator));
-                filePathLabel.setText("Files in: " + filePath);
-                for (Iterator<File> f = fileList.iterator(); f.hasNext(); ) {
+            model.setFileList(fileChooser.showOpenMultipleDialog(primaryStage));
+            if (model.getFileList() != null) {
+                model.setPath();
+                filePathLabel.setText(model.getFileList().size() + " Files in: " + model.getPath());
+                for (Iterator<File> f = model.getFileList().iterator(); f.hasNext(); ) {
                     String name = f.next().getName();
                     System.out.println(name);
                 }
+                // Populate the ListViews
+                fileListView.setItems(model.getFileList());
+                UpdatePreviewList();
             }
         });
 
@@ -99,6 +138,7 @@ public class Main extends Application {
         Label mainTextFieldLabel = new Label("Rename files according to this scheme (file names will iterate by number): ");
         mainTextField = new TextField();
         mainTextField.setMaxWidth(Constants.dimens.WIN_W * 0.75);
+        mainTextField.setOnKeyPressed(e -> UpdatePreviewList());
         Label extensionTextFieldLabel = new Label("Using this extension (leave blank to leave extensions as-is):");
 
         // Extension text field, to set a new file extension (optional)
@@ -110,11 +150,11 @@ public class Main extends Application {
         renameButton.setOnAction(e -> {
             ConfirmBox confirm = new ConfirmBox();
             if (confirm.show("Rename the selected files?")) {
-                // temporary iterator to give distinct file names
+                // temporary iterator to provide distinct file names
                 int iterator = 0;
                 // iterate through the file list
-                if (fileList != null) {
-                    for (Iterator<File> f = fileList.iterator(); f.hasNext(); ) {
+                if (!model.checkFileListNull()) {
+                    for (Iterator<File> f = model.getFileList().iterator(); f.hasNext(); ) {
                         // so we're not calling f.next() more than once per iteration
                         File currentFile = f.next();
                         // find the file extension, if it exists
@@ -134,7 +174,7 @@ public class Main extends Application {
                                 extension = extensionTextField.getText();
                             }
                         }
-                        File n = new File(filePath + File.separator + mainTextField.getText() + iterator + "." + extension);
+                        File n = new File(model.getPath() + File.separator + mainTextField.getText() + iterator + "." + extension);
                         if (currentFile.renameTo(n)) {
                             System.out.println("Success");
                         } else {
@@ -158,15 +198,49 @@ public class Main extends Application {
         controlPane.setPadding(new Insets(15, 15, 15, 15));
         controlPane.setSpacing(10);
 
-        HBox fileChooseLayout = new HBox();
-        fileChooseLayout.setSpacing(10);
-        fileChooseLayout.getChildren().addAll(fileChooseButton, filePathLabel);
+        controlPane.getChildren().addAll(fileChooseButton, filePathLabel, mainTextFieldLabel, mainTextField, extensionTextFieldLabel, extensionTextField, renameButton);
 
-        controlPane.getChildren().addAll(fileChooseLayout, mainTextFieldLabel, mainTextField, extensionTextFieldLabel, extensionTextField, renameButton);
+        filePreviewListPane = new HBox();
+        filePreviewListPane.setPadding(new Insets(10, 10, 10, 10));
+        filePreviewListPane.setSpacing(10);
+        filePreviewListPane.getChildren().addAll(fileListView, previewListView);
 
         layout.setCenter(controlPane);
+        layout.setRight(filePreviewListPane);
 
         primaryStage.setScene(new Scene(layout, Constants.dimens.WIN_W, Constants.dimens.WIN_H));
         primaryStage.show();
+    }
+
+    private void UpdatePreviewList() {
+        ObservableList<String> previewList = FXCollections.observableArrayList(model.getFileListNames());
+        // temporary iterator to provide distinct file names
+        int iterator = 0;
+        // iterate through the file list
+        for (Iterator<String> f = previewList.iterator(); f.hasNext(); ) {
+            // so we're not calling f.next() more than once per iteration
+            String currentFile = f.next();
+            // find the file extension, if it exists
+            String[] fileExtensionArray = currentFile.split("\\.");
+            String extension;
+            // if there was no extension, do not set a default
+            if (fileExtensionArray.length < 2) {
+                extension = "";
+            } else {
+                extension = fileExtensionArray[fileExtensionArray.length - 1];
+            }
+            // if user has set a new extension, use that minus any . characters
+            if (!extensionTextField.getText().equals("")) {
+                if (extensionTextField.getText().charAt(0) == ('.')) {
+                    extension = extensionTextField.getText().substring(1); // "tar.gz" instead of ".tar.gz"
+                } else {
+                    extension = extensionTextField.getText();
+                }
+            }
+            File n = new File(model.getPath() + File.separator + mainTextField.getText() + iterator + "." + extension);
+            currentFile = mainTextField.getText() + iterator + "." + extension;
+            iterator++;
+        }
+        previewListView.setItems(previewList);
     }
 }
