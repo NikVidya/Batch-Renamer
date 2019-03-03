@@ -24,6 +24,11 @@ public class Model {
         }
         return fileList;
     }
+
+    /**
+     * Returns a list of file names from the file list
+     * @return ArrayList<String>
+     */
     public ArrayList<String> getFileListNames() {
         ArrayList<String> res = new ArrayList<>();
         for (Iterator<File> f = fileList.iterator(); f.hasNext(); ) {

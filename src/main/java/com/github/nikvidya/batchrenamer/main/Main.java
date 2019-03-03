@@ -138,12 +138,13 @@ public class Main extends Application {
         Label mainTextFieldLabel = new Label("Rename files according to this scheme (file names will iterate by number): ");
         mainTextField = new TextField();
         mainTextField.setMaxWidth(Constants.dimens.WIN_W * 0.75);
-        mainTextField.setOnKeyPressed(e -> UpdatePreviewList());
+        mainTextField.setOnKeyTyped(e -> UpdatePreviewList());
         Label extensionTextFieldLabel = new Label("Using this extension (leave blank to leave extensions as-is):");
 
         // Extension text field, to set a new file extension (optional)
         extensionTextField = new TextField("");
         extensionTextField.setMaxWidth(Constants.dimens.WIN_W * 0.3);
+        extensionTextField.setOnKeyTyped(e -> UpdatePreviewList());
 
         // Confirm rename
         renameButton = new Button("Rename Files");
@@ -239,6 +240,7 @@ public class Main extends Application {
             }
             File n = new File(model.getPath() + File.separator + mainTextField.getText() + iterator + "." + extension);
             currentFile = mainTextField.getText() + iterator + "." + extension;
+            previewList.set(iterator, currentFile);
             iterator++;
         }
         previewListView.setItems(previewList);
