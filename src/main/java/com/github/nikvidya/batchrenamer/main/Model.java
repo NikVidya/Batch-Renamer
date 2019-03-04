@@ -37,7 +37,14 @@ public class Model {
         return res;
     }
     public void setFileList(List<File> l) {
-        fileList = FXCollections.observableArrayList(l);
+        if (l == null) {
+            fileList = FXCollections.observableArrayList();
+        } else {
+            fileList = FXCollections.observableArrayList(l);
+        }
+    }
+    public void setElement(int index, File file) {
+        fileList.set(index, file);
     }
     public boolean checkFileListNull() {
         return fileList == null;
@@ -49,7 +56,7 @@ public class Model {
         return path;
     }
     public void setPath() {
-        if (!checkFileListNull()) {
+        if (!checkFileListNull() && !fileList.isEmpty()) {
             path = fileList.get(0).getAbsolutePath().substring(0, fileList.get(0).getAbsolutePath().lastIndexOf(File.separator));
         }
     }

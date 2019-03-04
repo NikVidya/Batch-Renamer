@@ -17,14 +17,14 @@ import javafx.stage.Stage;
 
 import java.io.File;
 import java.util.Iterator;
-import java.util.List;
 
 /**
  * Entry point for the program, acts as controller for the program
  * TODO: Make user-defined variables
- * TODO: Add feedback and preview panels so user knows how the renaming scheme will look (View)
  * TODO: Add undo button to reverse the rename
  * TODO: Add tooltips (instead of long bracketed notes in the labels)
+ * TODO: Separate out the views to more clearly model MVC pattern
+ * TODO: More edge case work
  */
 public class Main extends Application {
     private Model model;
@@ -32,7 +32,6 @@ public class Main extends Application {
     // layout and interfaces
     private BorderPane layout;
     private VBox controlPane;
-    private VBox filePreviewPane;
     private HBox filePreviewListPane;
     private SettingsMenu settingsMenu;
     private ListView<File> fileListView;
@@ -121,7 +120,10 @@ public class Main extends Application {
         fileChooser.setTitle("Select files to batch rename");
         fileChooseButton.setOnAction(e -> {
             model.setFileList(fileChooser.showOpenMultipleDialog(primaryStage));
-            if (model.getFileList() != null) {
+            previewListView.getItems().clear();
+            fileListView.getItems().clear();
+            filePathLabel.setText("");
+            if (!model.getFileList().isEmpty()) {
                 model.setPath();
                 filePathLabel.setText(model.getFileList().size() + " Files in: " + model.getPath());
                 for (Iterator<File> f = model.getFileList().iterator(); f.hasNext(); ) {
@@ -177,10 +179,11 @@ public class Main extends Application {
                         }
                         File n = new File(model.getPath() + File.separator + mainTextField.getText() + iterator + "." + extension);
                         if (currentFile.renameTo(n)) {
+                            model.setElement(iterator, n);
                             System.out.println("Success");
                         } else {
                             AlertBox alert = new AlertBox();
-                            alert.show("Error in renaming files");
+                            alert.show("Error in renaming file " + currentFile.getName());
                         }
                         iterator++;
                     }
@@ -188,6 +191,7 @@ public class Main extends Application {
                     AlertBox alert = new AlertBox();
                     alert.show("No files selected, please select files");
                 }
+                fileListView.setItems(model.getFileList());
             }
         });
 
@@ -230,7 +234,7 @@ public class Main extends Application {
             } else {
                 extension = fileExtensionArray[fileExtensionArray.length - 1];
             }
-            // if user has set a new extension, use that minus any . characters
+            // if user has set a new extension, use that minus any "." characters
             if (!extensionTextField.getText().equals("")) {
                 if (extensionTextField.getText().charAt(0) == ('.')) {
                     extension = extensionTextField.getText().substring(1); // "tar.gz" instead of ".tar.gz"
